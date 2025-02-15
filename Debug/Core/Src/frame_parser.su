@@ -1,0 +1,2 @@
+../Core/Src/frame_parser.c:15:9:frame_parser_create	24	static
+../Core/Src/frame_parser.c:37:19:frame_parser_analyze	32	static
