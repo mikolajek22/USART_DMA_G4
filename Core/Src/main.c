@@ -17,8 +17,8 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-#include <frame_parser.h>
 #include "main.h"
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <string.h>
@@ -111,10 +111,10 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  usartMessage_t message;
+	  volatile usartMessage_t message;
 	  message = usart_dma_frameProcess();
 
-	  // Data to send
+//	   Data to send
 	  usartMessage_t dataToSend = {
 	  				  .addr = 1,
 	  				  .arg = 2,
@@ -126,13 +126,13 @@ int main(void)
 		  dataToSend.payload[z] = z;
 	  }
 	  dataToSend.len = MAX_PAYLOAD_SIZE;
-	  // parse into frame
+//	   parse into frame
 	  memset(frameToSend, 0, MAX_FRAME_SIZE);
 	  uint8_t frameSize = frame_parser_create(frameToSend, &dataToSend);
 
-	  // send over usart
+//	   send over usart
 	  usart_dma_SendFrame(frameToSend, frameSize);
-	  HAL_Delay(500);
+//	  HAL_Delay(500);
   }
   /* USER CODE END 3 */
 }
@@ -242,6 +242,10 @@ static void MX_LPUART1_UART_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN LPUART1_Init 2 */
+  __HAL_UART_DISABLE(&hlpuart1);
+  MODIFY_REG(hlpuart1.Instance->CR2, USART_CR2_ADD, (191 << USART_CR2_ADD_Pos));
+  SET_BIT(hlpuart1.Instance->CR1, USART_CR1_CMIE);
+  __HAL_UART_ENABLE(&hlpuart1);
 
   /* USER CODE END LPUART1_Init 2 */
 

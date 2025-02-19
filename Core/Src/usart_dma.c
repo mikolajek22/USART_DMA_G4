@@ -14,45 +14,38 @@ ringBuffer_t ringBufTx;
 uint8_t rcvBuffer[MAX_RCV_SIZE];
 volatile uint8_t isDmaSend;				// check if DMA is busy
 volatile uint8_t frameEndCnt;			// counter for frames in rcv_RB
+static uint8_t cntFrames;
 UART_HandleTypeDef *huartHandler;
 
 HAL_StatusTypeDef uart_Send();
 
-// Receiving done - CB
-void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
-	if(huart->Instance == LPUART1) {
-
-		static uint8_t start = 0;
-		// assuming that data can be send with delays - CB from IDLE
-		static uint8_t tempBuf[MAX_FRAME_SIZE];
-		static uint8_t tempPos = 0;
-
-		for (uint8_t i = 0; i < Size; i++) {
-			// do not save trash data to RB
-			if (rcvBuffer[i] == SOF_CHAR || start == 1) {
-				start = 1;
-				// save in temp buffer - prevent RB from corrupted frames
-				tempBuf[tempPos++] = rcvBuffer[i];
-				if (rcvBuffer[i] == EOF_CHAR) {
-					for (uint8_t j = 0; j < tempPos; j++) {
-						RB_write(&ringBufRx, tempBuf[j]);
-					}
-					// ready to parse
-					frameEndCnt++;
-					tempPos = 0;
-				}
-				else if (tempPos > MAX_FRAME_SIZE) {
-					/* ERROR - frame is bigger than expected */
-					start = 0;
-					tempPos = 0;
-				}
-			}
-		}
+void HAL_UART_CMF_CB(UART_HandleTypeDef *huart) {
+	uint16_t static prevPos;
+	uint16_t static actPos;
+	actPos = MAX_RCV_SIZE - __HAL_DMA_GET_COUNTER(huart->hdmarx);
+	/* calculate expected frame size - start searching SOF from -167 bytes if data to process if greater than maximum frame size */
+	uint16_t expectedFrSize = (actPos >= prevPos) ? (actPos - prevPos) : (actPos + MAX_RCV_SIZE - prevPos);
+	if (expectedFrSize > MAX_FRAME_SIZE) {
+		expectedFrSize = MAX_FRAME_SIZE;
+		prevPos = (actPos > MAX_FRAME_SIZE) ? (actPos - MAX_FRAME_SIZE) : (MAX_RCV_SIZE - (MAX_FRAME_SIZE - actPos));
 	}
 
-	HAL_UARTEx_ReceiveToIdle_DMA(huartHandler, rcvBuffer, MAX_RCV_SIZE);
-	__HAL_DMA_DISABLE_IT(huartHandler->hdmarx, DMA_IT_HT);
+	uint8_t idx = 0;
+	uint8_t start = 0;
+	do {
+		if (rcvBuffer[prevPos] == SOF_CHAR || start) {
+			start = 1;
+			RB_write(&ringBufRx, rcvBuffer[prevPos]);
+		}
+		idx++;
+		prevPos++;
+		if (prevPos >= MAX_RCV_SIZE) {prevPos = 0;}
+	} while (idx < expectedFrSize);
+	if (start) {
+		frameEndCnt++;
+	}
 }
+
 
 // Sending done - CB
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
@@ -71,9 +64,9 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
 
 void usart_dma_init(UART_HandleTypeDef *huart) {
 	huartHandler = huart;
-
 	/* Disable callback from receiving half of the expected data*/
-	HAL_UARTEx_ReceiveToIdle_DMA(huartHandler, rcvBuffer, MAX_RCV_SIZE);
+//	HAL_UART_Receive_DMA(huart, pData, Size)
+	HAL_UART_Receive_DMA(huartHandler, rcvBuffer, MAX_RCV_SIZE);
 	__HAL_DMA_DISABLE_IT(huartHandler->hdmarx, DMA_IT_HT);
 }
 
@@ -99,24 +92,26 @@ usartMessage_t usart_dma_frameProcess(){
 	uint8_t val = 0;
 	memset(&msg, 0, sizeof(msg));
 	if (frameEndCnt > 0) {
-			  // find SOF - start of the frame (ensure)
-			  do {
-				  RB_read(&ringBufRx, &val);
-				  if (val == SOF_CHAR || isSof == 1) {
-					  isSof = 1;
-					  rawFrame[i] = val;
-					  i++;
-				  }
-			  } while(val != EOF_CHAR && i < MAX_FRAME_SIZE);
+		// find SOF - start of the frame (ensure)
+		do {
+			RB_read(&ringBufRx, &val);
+			if (val == SOF_CHAR || isSof == 1) {
+				isSof = 1;
+				rawFrame[i] = val;
+				i++;
+			}
+		} while(val != EOF_CHAR && i < MAX_FRAME_SIZE);
 
-			  // parse frame into data struct
-			  frame_parser_analyze(rawFrame, i, &msg);
+		// parse frame into data struct
 
-			  // parsing done.
-			  __disable_irq();
-			  frameEndCnt--;
-			  __enable_irq();
-		  }
+		frame_parser_analyze(rawFrame, i, &msg);
+
+		// parsing done.
+		__disable_irq();
+		frameEndCnt--;
+		__enable_irq();
+		cntFrames++;
+	}
 	return msg;
 }
 

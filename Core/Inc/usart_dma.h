@@ -18,4 +18,5 @@
 HAL_StatusTypeDef usart_dma_SendFrame(uint8_t *pData, size_t size);
 usartMessage_t usart_dma_frameProcess();
 void usart_dma_init(UART_HandleTypeDef *huart);
+void HAL_UART_CMF_CB(UART_HandleTypeDef *huart);
 #endif /* INC_USART_DMA_H_ */

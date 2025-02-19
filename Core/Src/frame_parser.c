@@ -59,6 +59,7 @@ HAL_StatusTypeDef frame_parser_analyze(uint8_t *rawFrame, uint8_t size, usartMes
 	}
 
 //	everything is ok.
+
 	message->addr 	= rawFrame[1];
 	message->cmd 	= rawFrame[2];
 	message->arg 	= rawFrame[3];

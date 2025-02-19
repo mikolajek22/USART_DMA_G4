@@ -249,6 +249,10 @@ void LPUART1_IRQHandler(void)
 {
   /* USER CODE BEGIN LPUART1_IRQn 0 */
 
+	if (__HAL_UART_GET_FLAG(&hlpuart1, UART_FLAG_CMF)) {
+		__HAL_UART_CLEAR_FLAG(&hlpuart1, UART_FLAG_CMF);
+		HAL_UART_CMF_CB(&hlpuart1);
+	}
   /* USER CODE END LPUART1_IRQn 0 */
   HAL_UART_IRQHandler(&hlpuart1);
   /* USER CODE BEGIN LPUART1_IRQn 1 */
