@@ -1,1 +1,12 @@
-Debug/\nRelease/\n*.elf\n*.bin\n*.hex\n*.map\n*.o\n.settings/\n*.launch\n*.cproject\n*.project\n*.mxproject
+Debug/
+Release/
+*.elf
+*.bin
+*.hex
+*.map
+*.o
+.settings/
+*.launch
+*.cproject
+*.project
+*.mxproject
